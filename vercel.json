@@ -1,7 +1,19 @@
 {
   "functions": {
     "api/extract.py": {
-      "runtime": "python@3.10"
+      "runtime": "python3.10"
     }
-  }
+  },
+  "builds": [
+    {
+      "src": "api/extract.py",
+      "use": "@vercel/python"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "api/extract.py"
+    }
+  ]
 }
