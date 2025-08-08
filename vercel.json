@@ -1,0 +1,7 @@
+{
+  "functions": {
+    "api/extract.py": {
+      "runtime": "python3.10"
+    }
+  }
+}
