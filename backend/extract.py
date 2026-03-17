@@ -105,6 +105,8 @@ def load_mlflow():
     try:
         import mlflow
         import mlflow.pyfunc
+        
+        logger.info(f"mlflow version: {mlflow.__version__}")
 
         username = os.getenv("MLFLOW_TRACKING_USERNAME")
         password = os.getenv("MLFLOW_TRACKING_PASSWORD")
@@ -129,7 +131,7 @@ def load_mlflow():
         return True
 
     except ImportError:
-        logger.error("mlflow package not installed — falling back to local loading")
+        logger.error(f"mlflow import error: {e} — falling back to local loading")
         return load_local()
     except Exception as e:
         logger.error(f"Error loading MLflow model: {e}")
