@@ -9,6 +9,7 @@ nltk==3.9.1
 
 # ── MLflow (versioning & optional model serving) ────────────────────────────
 mlflow==2.21.3
+pyarrow==17.0.0
 
 # ── Utilities ───────────────────────────────────────────────────────────────
 python-dotenv==1.1.0
