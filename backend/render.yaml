@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: keyextract-api
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn extract:app --bind 0.0.0.0:$PORT --workers 1 --timeout 120
+    envVars:
+      - key: FLASK_DEBUG
+        value: "0"
+      - key: MODEL_SOURCE
+        value: "local"
+      # Uncomment below to enable MLflow model loading instead:
+      # - key: MODEL_SOURCE
+      #   value: "mlflow"
+      # - key: MLFLOW_TRACKING_URI
+      #   value: "https://dagshub.com/<your-user>/<your-repo>.mlflow"
+      # - key: MLFLOW_TRACKING_USERNAME
+      #   sync: false   # set via Render dashboard secrets
+      # - key: MLFLOW_TRACKING_PASSWORD
+      #   sync: false   # set via Render dashboard secrets
+      # - key: MLFLOW_MODEL_NAME
+      #   value: "keyword-extractor-tfidf"
+      # - key: MLFLOW_MODEL_STAGE
+      #   value: "Production"

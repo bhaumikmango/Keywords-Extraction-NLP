@@ -1,631 +1,1170 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Keyword Extractor</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.min.js"></script>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KeyExtract — TF-IDF Keyword Intelligence</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,300;0,500;0,700;1,300&family=IBM+Plex+Mono:wght@300;400;500&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    /* ─── Reset & Base ───────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-        body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            color: #333;
-        }
+    :root {
+      --bg:        #0B0C10;
+      --surface:   #13141A;
+      --surface2:  #1A1C25;
+      --border:    #252733;
+      --border2:   #2E3040;
+      --text:      #E8EAF0;
+      --muted:     #6B6E80;
+      --muted2:    #9295A8;
+      --accent1:   #00D9A3;
+      --accent2:   #00B4FF;
+      --accent3:   #7B5CFA;
+      --danger:    #FF5C6A;
+      --success:   #00D9A3;
 
-        .container {
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 20px;
-        }
+      --grad-primary:   linear-gradient(135deg, #00D9A3, #00B4FF);
+      --grad-purple:    linear-gradient(135deg, #7B5CFA, #00B4FF);
+      --grad-warm:      linear-gradient(135deg, #FF8A65, #FF5C6A);
+      --grad-score:     linear-gradient(90deg, #00D9A3, #00B4FF);
 
-        .header {
-            text-align: center;
-            margin-bottom: 40px;
-            color: white;
-        }
+      --radius-sm: 6px;
+      --radius:    12px;
+      --radius-lg: 18px;
+      --radius-xl: 24px;
 
-        .header h1 {
-            font-size: 3.5rem;
-            font-weight: 700;
-            margin-bottom: 10px;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
-        }
+      --shadow-sm: 0 2px 8px rgba(0,0,0,0.4);
+      --shadow:    0 4px 20px rgba(0,0,0,0.5);
+      --shadow-lg: 0 8px 40px rgba(0,0,0,0.6);
+      --glow:      0 0 30px rgba(0,217,163,0.12);
+    }
 
-        .header p {
-            font-size: 1.3rem;
-            opacity: 0.9;
-            font-weight: 300;
-        }
+    html { scroll-behavior: smooth; }
 
-        .main-content {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 30px;
-            flex: 1;
-        }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Instrument Sans', sans-serif;
+      font-size: 15px;
+      line-height: 1.6;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
 
-        .input-section, .results-section {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            border-radius: 20px;
-            padding: 30px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-        }
+    /* ─── Dot Grid Texture ───────────────────────────────────────── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: radial-gradient(circle, rgba(255,255,255,0.035) 1px, transparent 1px);
+      background-size: 28px 28px;
+      pointer-events: none;
+      z-index: 0;
+    }
 
-        .section-title {
-            font-size: 1.8rem;
-            font-weight: 600;
-            margin-bottom: 20px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            color: #4a5568;
-        }
+    /* ─── Ambient Glow Blobs ─────────────────────────────────────── */
+    .blob {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(80px);
+      pointer-events: none;
+      z-index: 0;
+      opacity: 0.18;
+      animation: blobDrift 18s ease-in-out infinite alternate;
+    }
+    .blob-1 { width: 420px; height: 420px; background: #00D9A3; top: -120px; left: -100px; }
+    .blob-2 { width: 360px; height: 360px; background: #7B5CFA; bottom: -80px; right: -80px; animation-delay: -6s; }
+    .blob-3 { width: 280px; height: 280px; background: #00B4FF; top: 40%; left: 60%; animation-delay: -12s; opacity: 0.10; }
 
-        .sample-selector {
-            margin-bottom: 20px;
-        }
+    @keyframes blobDrift {
+      from { transform: translate(0, 0) scale(1); }
+      to   { transform: translate(30px, 20px) scale(1.06); }
+    }
 
-        .sample-selector select {
-            width: 100%;
-            padding: 12px 15px;
-            border: 2px solid #e2e8f0;
-            border-radius: 12px;
-            font-size: 1rem;
-            background: white;
-            transition: all 0.3s ease;
-        }
+    /* ─── Layout ─────────────────────────────────────────────────── */
+    .wrapper {
+      position: relative;
+      z-index: 1;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 24px 60px;
+    }
 
-        .sample-selector select:focus {
-            outline: none;
-            border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-        }
+    /* ─── Header ─────────────────────────────────────────────────── */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 28px 0 20px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 48px;
+    }
 
-        .text-input {
-            width: 100%;
-            height: 200px;
-            padding: 15px;
-            border: 2px solid #e2e8f0;
-            border-radius: 12px;
-            font-size: 1rem;
-            font-family: inherit;
-            resize: vertical;
-            transition: all 0.3s ease;
-            background: white;
-        }
+    .logo {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+    }
 
-        .text-input:focus {
-            outline: none;
-            border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-        }
+    .logo-mark {
+      font-family: 'Fraunces', serif;
+      font-size: 26px;
+      font-weight: 700;
+      background: var(--grad-primary);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      letter-spacing: -0.5px;
+    }
 
-        .controls {
-            display: flex;
-            align-items: center;
-            gap: 20px;
-            margin: 20px 0;
-        }
+    .logo-sub {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 10px;
+      font-weight: 300;
+      color: var(--muted);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      align-self: center;
+    }
 
-        .keyword-count {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
+    .status-pill {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 6px 14px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 100px;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .status-pill:hover { border-color: var(--border2); color: var(--muted2); }
 
-        .keyword-count input {
-            width: 70px;
-            padding: 8px;
-            border: 2px solid #e2e8f0;
-            border-radius: 8px;
-            text-align: center;
-            font-size: 1rem;
-        }
+    .status-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--muted);
+      transition: background 0.3s;
+    }
+    .status-dot.online  { background: var(--accent1); box-shadow: 0 0 8px rgba(0,217,163,0.6); }
+    .status-dot.offline { background: var(--danger); }
+    .status-dot.checking { animation: pulse 1s infinite; background: #FFB347; }
 
-        .extract-btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            padding: 15px 30px;
-            border-radius: 50px;
-            font-size: 1.1rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
-        }
+    @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
 
-        .extract-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
-        }
+    /* ─── Hero Caption ───────────────────────────────────────────── */
+    .hero {
+      text-align: center;
+      margin-bottom: 52px;
+    }
+    .hero h1 {
+      font-family: 'Fraunces', serif;
+      font-size: clamp(36px, 5vw, 56px);
+      font-weight: 700;
+      line-height: 1.15;
+      letter-spacing: -1.5px;
+      margin-bottom: 14px;
+    }
+    .hero h1 .line2 {
+      background: var(--grad-primary);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .hero p {
+      color: var(--muted2);
+      font-size: 16px;
+      max-width: 480px;
+      margin: 0 auto;
+      font-weight: 400;
+    }
 
-        .extract-btn:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-            transform: none;
-        }
+    /* ─── Main Grid ──────────────────────────────────────────────── */
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      align-items: start;
+    }
 
-        .loading {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 40px;
-            color: #667eea;
-        }
+    @media (max-width: 900px) {
+      .main-grid { grid-template-columns: 1fr; }
+    }
 
-        .spinner {
-            width: 40px;
-            height: 40px;
-            border: 4px solid #e2e8f0;
-            border-top: 4px solid #667eea;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin-right: 15px;
-        }
+    /* ─── Cards ──────────────────────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      padding: 28px;
+      box-shadow: var(--shadow);
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .card:hover { border-color: var(--border2); }
 
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
+    .card-title {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 10px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 2.5px;
+      color: var(--muted);
+      margin-bottom: 18px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .card-title::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
 
-        .keywords-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 15px;
-            margin-bottom: 30px;
-        }
+    /* ─── Textarea ───────────────────────────────────────────────── */
+    .textarea-wrap {
+      position: relative;
+      margin-bottom: 20px;
+    }
 
-        .keyword-card {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 20px;
-            border-radius: 15px;
-            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
-            transition: all 0.3s ease;
-            position: relative;
-            overflow: hidden;
-        }
+    textarea {
+      width: 100%;
+      min-height: 240px;
+      max-height: 400px;
+      background: var(--surface2);
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-lg);
+      color: var(--text);
+      font-family: 'Instrument Sans', sans-serif;
+      font-size: 14px;
+      line-height: 1.7;
+      padding: 18px;
+      resize: vertical;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
 
-        .keyword-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 12px 30px rgba(102, 126, 234, 0.4);
-        }
+    textarea::placeholder { color: var(--muted); }
 
-        .keyword-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 3px;
-            background: rgba(255, 255, 255, 0.3);
-        }
+    textarea:focus {
+      border-color: var(--accent1);
+      box-shadow: 0 0 0 3px rgba(0,217,163,0.1);
+    }
 
-        .keyword-text {
-            font-size: 1.2rem;
-            font-weight: 600;
-            margin-bottom: 8px;
-        }
+    .textarea-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 8px;
+    }
 
-        .keyword-score {
-            font-size: 0.9rem;
-            opacity: 0.9;
-            background: rgba(255, 255, 255, 0.2);
-            padding: 5px 12px;
-            border-radius: 20px;
-            display: inline-block;
-        }
+    .char-count {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .char-count span { color: var(--muted2); }
 
-        .chart-container {
-            background: white;
-            padding: 20px;
-            border-radius: 15px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-            margin-bottom: 20px;
-        }
+    .clear-btn {
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-size: 12px;
+      font-family: 'IBM Plex Mono', monospace;
+      cursor: pointer;
+      padding: 3px 8px;
+      border-radius: 4px;
+      transition: color 0.2s, background 0.2s;
+    }
+    .clear-btn:hover { color: var(--danger); background: rgba(255,92,106,0.08); }
 
-        .download-btn {
-            background: #48bb78;
-            color: white;
-            border: none;
-            padding: 12px 25px;
-            border-radius: 25px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
+    /* ─── Slider Row ─────────────────────────────────────────────── */
+    .slider-row {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 22px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 18px;
+    }
 
-        .download-btn:hover {
-            background: #38a169;
-            transform: translateY(-2px);
-        }
+    .slider-label {
+      font-size: 13px;
+      color: var(--muted2);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
 
-        .error {
-            background: #fed7d7;
-            color: #c53030;
-            padding: 15px;
-            border-radius: 10px;
-            margin: 10px 0;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
+    input[type="range"] {
+      -webkit-appearance: none;
+      flex: 1;
+      height: 3px;
+      background: var(--border2);
+      border-radius: 2px;
+      outline: none;
+      cursor: pointer;
+    }
+    input[type="range"]::-webkit-slider-runnable-track {
+      height: 3px;
+      border-radius: 2px;
+      background: linear-gradient(to right, var(--accent1) 0%, var(--accent1) var(--pct, 45%), var(--border2) var(--pct, 45%));
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px; height: 16px;
+      border-radius: 50%;
+      background: #fff;
+      box-shadow: 0 0 0 2px var(--accent1), var(--shadow-sm);
+      margin-top: -6.5px;
+      transition: box-shadow 0.2s;
+    }
+    input[type="range"]:focus::-webkit-slider-thumb {
+      box-shadow: 0 0 0 3px var(--accent1), 0 0 12px rgba(0,217,163,0.4);
+    }
+    input[type="range"]::-moz-range-thumb {
+      width: 16px; height: 16px;
+      border-radius: 50%;
+      background: #fff;
+      border: 2px solid var(--accent1);
+      cursor: pointer;
+    }
 
-        .success {
-            background: #c6f6d5;
-            color: #2d7d32;
-            padding: 15px;
-            border-radius: 10px;
-            margin: 10px 0;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
+    .slider-value {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--accent1);
+      min-width: 24px;
+      text-align: right;
+    }
 
-        .empty-state {
-            text-align: center;
-            padding: 60px 20px;
-            color: #a0aec0;
-        }
+    /* ─── Extract Button ─────────────────────────────────────────── */
+    .btn-extract {
+      width: 100%;
+      padding: 15px 24px;
+      border: none;
+      border-radius: var(--radius-lg);
+      background: var(--grad-primary);
+      color: #0B0C10;
+      font-family: 'Instrument Sans', sans-serif;
+      font-weight: 600;
+      font-size: 15px;
+      letter-spacing: 0.3px;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.15s, box-shadow 0.2s, opacity 0.2s;
+      box-shadow: 0 4px 20px rgba(0,217,163,0.3);
+    }
 
-        .empty-state i {
-            font-size: 4rem;
-            margin-bottom: 20px;
-            opacity: 0.5;
-        }
+    .btn-extract::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(255,255,255,0.15), transparent 50%);
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    .btn-extract:hover:not(:disabled)::before { opacity: 1; }
+    .btn-extract:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 28px rgba(0,217,163,0.42); }
+    .btn-extract:active:not(:disabled) { transform: translateY(1px); }
+    .btn-extract:disabled { opacity: 0.5; cursor: not-allowed; }
 
-        .empty-state h3 {
-            font-size: 1.5rem;
-            margin-bottom: 10px;
-            color: #4a5568;
-        }
+    .btn-extract .btn-inner {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
 
-        @media (max-width: 768px) {
-            .main-content {
-                grid-template-columns: 1fr;
-            }
-            
-            .header h1 {
-                font-size: 2.5rem;
-            }
-            
-            .controls {
-                flex-direction: column;
-                align-items: stretch;
-            }
-            
-            .extract-btn {
-                justify-content: center;
-            }
-        }
+    /* Loading spinner inside button */
+    .spinner {
+      width: 16px; height: 16px;
+      border: 2px solid rgba(0,0,0,0.2);
+      border-top-color: #0B0C10;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: none;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
 
-        .tabs {
-            display: flex;
-            margin-bottom: 20px;
-            border-bottom: 2px solid #e2e8f0;
-        }
+    /* ─── API URL Config ─────────────────────────────────────────── */
+    .api-config {
+      margin-top: 16px;
+      border: 1px dashed var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      transition: border-color 0.2s;
+    }
+    .api-config:focus-within { border-color: var(--border2); }
 
-        .tab {
-            padding: 12px 24px;
-            background: none;
-            border: none;
-            cursor: pointer;
-            font-size: 1rem;
-            font-weight: 500;
-            color: #718096;
-            border-bottom: 2px solid transparent;
-            transition: all 0.3s ease;
-        }
+    .api-config-toggle {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+      cursor: pointer;
+      transition: color 0.2s;
+    }
+    .api-config-toggle:hover { color: var(--muted2); }
+    .api-config-toggle .arrow { transition: transform 0.2s; font-size: 9px; }
+    .api-config-toggle.open .arrow { transform: rotate(180deg); }
 
-        .tab.active {
-            color: #667eea;
-            border-bottom-color: #667eea;
-            background: rgba(102, 126, 234, 0.1);
-        }
+    .api-config-body {
+      display: none;
+      padding: 0 14px 14px;
+    }
+    .api-config-body.open { display: block; }
 
-        .tab:hover {
-            color: #667eea;
-            background: rgba(102, 126, 234, 0.05);
-        }
-    </style>
+    .api-config-body input {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 12px;
+      padding: 9px 12px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .api-config-body input:focus { border-color: var(--accent1); }
+    .api-config-body label {
+      display: block;
+      font-size: 11px;
+      color: var(--muted);
+      margin-bottom: 6px;
+      font-family: 'IBM Plex Mono', monospace;
+    }
+
+    /* ─── Results Panel ──────────────────────────────────────────── */
+    .results-empty {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 320px;
+      gap: 16px;
+      text-align: center;
+    }
+
+    .results-empty .icon-ring {
+      width: 72px; height: 72px;
+      border-radius: 50%;
+      border: 1.5px dashed var(--border2);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 28px;
+      color: var(--muted);
+      animation: rotateSlow 20s linear infinite;
+    }
+    @keyframes rotateSlow { to { transform: rotate(360deg); } }
+
+    .results-empty p {
+      color: var(--muted);
+      font-size: 13px;
+      font-family: 'IBM Plex Mono', monospace;
+      line-height: 1.8;
+    }
+
+    /* ─── Results Content ────────────────────────────────────────── */
+    #results-content { display: none; }
+
+    .results-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 22px;
+    }
+
+    .results-count {
+      font-family: 'Fraunces', serif;
+      font-size: 28px;
+      font-weight: 700;
+      line-height: 1;
+      background: var(--grad-primary);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .results-count-label {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 3px;
+      font-family: 'IBM Plex Mono', monospace;
+      letter-spacing: 1px;
+    }
+
+    .btn-copy {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 8px 15px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 100px;
+      color: var(--muted2);
+      font-size: 12px;
+      font-family: 'IBM Plex Mono', monospace;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-copy:hover { border-color: var(--accent1); color: var(--accent1); }
+    .btn-copy.copied {
+      background: rgba(0,217,163,0.1);
+      border-color: var(--accent1);
+      color: var(--accent1);
+    }
+
+    /* ─── Keyword Bars ───────────────────────────────────────────── */
+    .keyword-bars { display: flex; flex-direction: column; gap: 10px; }
+
+    .keyword-row {
+      display: grid;
+      grid-template-columns: 110px 1fr 56px;
+      align-items: center;
+      gap: 12px;
+      opacity: 0;
+      transform: translateX(-8px);
+      animation: rowIn 0.35s ease forwards;
+    }
+
+    @keyframes rowIn {
+      to { opacity: 1; transform: translateX(0); }
+    }
+
+    .kw-name {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .kw-track {
+      height: 8px;
+      background: var(--surface2);
+      border-radius: 4px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .kw-fill {
+      height: 100%;
+      border-radius: 4px;
+      background: var(--grad-score);
+      transform-origin: left;
+      transform: scaleX(0);
+      transition: transform 0.6s cubic-bezier(0.34,1.56,0.64,1);
+    }
+
+    .kw-score {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+      color: var(--accent1);
+      text-align: right;
+    }
+
+    /* ─── Keyword Chips ──────────────────────────────────────────── */
+    .keyword-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 22px;
+      padding-top: 20px;
+      border-top: 1px solid var(--border);
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 12px;
+      border-radius: 100px;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+      cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.15s;
+      opacity: 0;
+      animation: chipPop 0.3s ease forwards;
+      position: relative;
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      color: var(--muted2);
+    }
+
+    .chip:hover { transform: translateY(-2px); box-shadow: 0 4px 14px rgba(0,0,0,0.4); }
+    .chip.top3 {
+      background: linear-gradient(135deg, rgba(0,217,163,0.12), rgba(0,180,255,0.12));
+      border-color: rgba(0,217,163,0.4);
+      color: var(--accent1);
+    }
+
+    @keyframes chipPop {
+      0%   { opacity:0; transform: scale(0.85); }
+      60%  { transform: scale(1.04); }
+      100% { opacity:1; transform: scale(1); }
+    }
+
+    /* ─── Error State ────────────────────────────────────────────── */
+    .error-box {
+      display: none;
+      background: rgba(255,92,106,0.07);
+      border: 1px solid rgba(255,92,106,0.25);
+      border-radius: var(--radius);
+      padding: 14px 18px;
+      margin-top: 14px;
+      font-size: 13px;
+      color: #FF8A95;
+      font-family: 'IBM Plex Mono', monospace;
+      line-height: 1.6;
+    }
+
+    /* ─── Stats Bar ──────────────────────────────────────────────── */
+    .stats-bar {
+      display: flex;
+      gap: 20px;
+      margin-top: 22px;
+      padding-top: 20px;
+      border-top: 1px solid var(--border);
+    }
+    .stat { flex: 1; }
+    .stat-value {
+      font-family: 'Fraunces', serif;
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1;
+    }
+    .stat-label {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 10px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      margin-top: 4px;
+    }
+
+    /* ─── Footer ─────────────────────────────────────────────────── */
+    footer {
+      text-align: center;
+      margin-top: 60px;
+      padding-top: 24px;
+      border-top: 1px solid var(--border);
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: 0.5px;
+    }
+    footer a { color: var(--accent1); text-decoration: none; }
+
+    /* ─── Loading overlay ────────────────────────────────────────── */
+    .loading-overlay {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 20px;
+      min-height: 320px;
+    }
+    .loading-overlay.active { display: flex; }
+
+    .loader-ring {
+      width: 48px; height: 48px;
+      border-radius: 50%;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent1);
+      animation: spin 0.8s linear infinite;
+    }
+
+    .loading-text {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 12px;
+      color: var(--muted);
+      letter-spacing: 1px;
+    }
+    .loading-dots::after {
+      content: '';
+      animation: dots 1.4s steps(4,end) infinite;
+    }
+    @keyframes dots {
+      0%   { content: ''; }
+      25%  { content: '.'; }
+      50%  { content: '..'; }
+      75%  { content: '...'; }
+      100% { content: ''; }
+    }
+
+    /* ─── Toast ──────────────────────────────────────────────────── */
+    .toast {
+      position: fixed;
+      bottom: 28px;
+      right: 28px;
+      padding: 12px 20px;
+      background: var(--surface2);
+      border: 1px solid var(--accent1);
+      border-radius: var(--radius);
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 12px;
+      color: var(--accent1);
+      box-shadow: var(--shadow-lg);
+      opacity: 0;
+      transform: translateY(12px);
+      transition: all 0.25s;
+      pointer-events: none;
+      z-index: 100;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+
+    /* ─── Responsive ─────────────────────────────────────────────── */
+    @media (max-width: 640px) {
+      .wrapper { padding: 0 16px 40px; }
+      header { padding: 20px 0 16px; margin-bottom: 32px; }
+      .hero { margin-bottom: 32px; }
+      .hero p { font-size: 14px; }
+      .card { padding: 20px; }
+      .stats-bar { gap: 14px; }
+      .keyword-row { grid-template-columns: 90px 1fr 48px; }
+      .toast { bottom: 16px; right: 16px; left: 16px; text-align: center; }
+    }
+
+    @media (max-width: 380px) {
+      .keyword-row { grid-template-columns: 78px 1fr 44px; }
+      .logo-mark { font-size: 22px; }
+    }
+
+    /* ─── Scroll animation utility ───────────────────────────────── */
+    .fade-up {
+      opacity: 0;
+      transform: translateY(20px);
+      animation: fadeUp 0.5s ease forwards;
+    }
+    @keyframes fadeUp {
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
 </head>
 <body>
-    <div id="root"></div>
 
-    <script type="text/babel">
-        const { useState, useEffect } = React;
+  <!-- Ambient blobs -->
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+  <div class="blob blob-3"></div>
 
-        const sampleTexts = {
-            "": "",
-            "Machine Learning Research": "Machine learning algorithms have revolutionized the field of artificial intelligence by enabling computers to learn patterns from data without explicit programming. Deep neural networks, particularly convolutional neural networks, have shown remarkable performance in image recognition tasks. Natural language processing applications using transformer architectures have achieved state-of-the-art results in various linguistic tasks including sentiment analysis, machine translation, and text summarization.",
-            "Climate Change Article": "Climate change represents one of the most pressing challenges of our time, with global temperatures rising at an unprecedented rate due to greenhouse gas emissions. The melting of polar ice caps and glaciers contributes to sea level rise, threatening coastal communities worldwide. Renewable energy technologies, including solar panels and wind turbines, offer promising solutions to reduce carbon dioxide emissions and mitigate the effects of global warming.",
-            "Medical Research": "Recent advances in biomedical research have led to breakthrough treatments for various diseases. Gene therapy techniques using CRISPR technology allow precise editing of DNA sequences to correct genetic disorders. Immunotherapy approaches harness the body's immune system to fight cancer cells more effectively than traditional chemotherapy. Personalized medicine based on genetic profiles promises to revolutionize healthcare delivery."
-        };
+  <div class="wrapper">
 
-        
-        const extractKeywords = async (text, numKeywords) => {
-            const response = await fetch('/api/extract', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                text: text,
-                numKeywords: numKeywords
-                }),
-            });
-    
-            if (!response.ok) {
-                throw new Error('Failed to extract keywords');
-            }
-    
-            return await response.json();
-        };
+    <!-- ── Header ───────────────────────────────────────── -->
+    <header>
+      <div class="logo">
+        <span class="logo-mark">KeyExtract</span>
+        <span class="logo-sub">TF-IDF</span>
+      </div>
+      <button class="status-pill" id="statusPill" title="Check API health">
+        <span class="status-dot checking" id="statusDot"></span>
+        <span id="statusText">checking...</span>
+      </button>
+    </header>
 
-        const BarChart = ({ keywords }) => {
-            const canvasRef = React.useRef(null);
-            const chartRef = React.useRef(null);
+    <!-- ── Hero ─────────────────────────────────────────── -->
+    <section class="hero fade-up">
+      <h1>
+        Surface what<br/>
+        <span class="line2">truly matters.</span>
+      </h1>
+      <p>Paste any document, abstract, or text block — and pull out the highest-signal keywords instantly using TF-IDF intelligence.</p>
+    </section>
 
-            useEffect(() => {
-                if (!keywords || Object.keys(keywords).length === 0) return;
+    <!-- ── Main Grid ─────────────────────────────────────── -->
+    <div class="main-grid">
 
-                const ctx = canvasRef.current.getContext('2d');
-                
-                if (chartRef.current) {
-                    chartRef.current.destroy();
-                }
+      <!-- ── Input Card ──── -->
+      <div class="card fade-up" style="animation-delay:0.1s">
+        <div class="card-title">Input Text</div>
 
-                const labels = Object.keys(keywords);
-                const data = Object.values(keywords);
+        <div class="textarea-wrap">
+          <textarea
+            id="textInput"
+            placeholder="Paste your document, research abstract, article, or any body of text here...
 
-                chartRef.current = new Chart(ctx, {
-                    type: 'horizontalBar',
-                    data: {
-                        labels: labels,
-                        datasets: [{
-                            label: 'TF-IDF Score',
-                            data: data,
-                            backgroundColor: 'rgba(102, 126, 234, 0.8)',
-                            borderColor: 'rgba(102, 126, 234, 1)',
-                            borderWidth: 1
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        scales: {
-                            x: {
-                                beginAtZero: true
-                            }
-                        },
-                        plugins: {
-                            legend: {
-                                display: false
-                            }
-                        }
-                    }
-                });
+The model uses TF-IDF scoring to identify the most statistically significant terms unique to your content."
+          ></textarea>
+        </div>
 
-                return () => {
-                    if (chartRef.current) {
-                        chartRef.current.destroy();
-                    }
-                };
-            }, [keywords]);
+        <div class="textarea-meta">
+          <span class="char-count"><span id="wordCount">0</span> words · <span id="charCount">0</span> chars</span>
+          <button class="clear-btn" id="clearBtn">✕ clear</button>
+        </div>
 
-            return <canvas ref={canvasRef} height="300"></canvas>;
-        };
+        <div class="slider-row" style="margin-top:18px;">
+          <span class="slider-label">Keywords</span>
+          <input type="range" id="numKeywords" min="1" max="30" value="10" />
+          <span class="slider-value" id="sliderVal">10</span>
+        </div>
 
-        const KeywordExtractor = () => {
-            const [text, setText] = useState('');
-            const [numKeywords, setNumKeywords] = useState(10);
-            const [keywords, setKeywords] = useState({});
-            const [loading, setLoading] = useState(false);
-            const [error, setError] = useState('');
-            const [success, setSuccess] = useState('');
-            const [activeTab, setActiveTab] = useState('list');
+        <button class="btn-extract" id="extractBtn">
+          <span class="btn-inner">
+            <span class="spinner" id="btnSpinner"></span>
+            <span id="btnText">⟶ Extract Keywords</span>
+          </span>
+        </button>
 
-            const handleSampleSelect = (e) => {
-                setText(sampleTexts[e.target.value]);
-            };
+        <div class="error-box" id="errorBox"></div>
 
-            const handleExtract = async () => {
-                if (!text.trim()) {
-                    setError('Please enter some text to analyze.');
-                    return;
-                }
+        <!-- API URL Configuration -->
+        <div class="api-config" id="apiConfig">
+          <button class="api-config-toggle" id="configToggle">
+            <span>⚙ API endpoint</span>
+            <span class="arrow">▼</span>
+          </button>
+          <div class="api-config-body" id="configBody">
+            <label>Backend URL</label>
+            <input
+              type="url"
+              id="apiUrlInput"
+              placeholder="https://your-api.onrender.com"
+            />
+          </div>
+        </div>
+      </div>
 
-                setLoading(true);
-                setError('');
-                setSuccess('');
+      <!-- ── Results Card ── -->
+      <div class="card fade-up" style="animation-delay:0.2s">
+        <div class="card-title">Extracted Keywords</div>
 
-                try {
-                    const result = await extractKeywords(text, numKeywords);
-                    setKeywords(result);
-                    setSuccess(`Successfully extracted ${Object.keys(result).length} keywords!`);
-                } catch (err) {
-                    setError('Failed to extract keywords. Please try again.');
-                } finally {
-                    setLoading(false);
-                }
-            };
+        <!-- Empty state -->
+        <div class="results-empty" id="resultsEmpty">
+          <div class="icon-ring">⟳</div>
+          <p>awaiting input<br/>extract keywords to see results</p>
+        </div>
 
-            const downloadCSV = () => {
-                const csv = 'Keyword,TF-IDF Score\n' + 
-                    Object.entries(keywords)
-                        .map(([keyword, score]) => `"${keyword}",${score}`)
-                        .join('\n');
-                
-                const blob = new Blob([csv], { type: 'text/csv' });
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.style.display = 'none';
-                a.href = url;
-                a.download = 'keywords.csv';
-                document.body.appendChild(a);
-                a.click();
-                window.URL.revokeObjectURL(url);
-                document.body.removeChild(a);
-            };
+        <!-- Loading state -->
+        <div class="loading-overlay" id="loadingOverlay">
+          <div class="loader-ring"></div>
+          <span class="loading-text loading-dots">Analysing text</span>
+        </div>
 
-            return (
-                <div className="container">
-                    <div className="header">
-                        <h1><i className="fas fa-search"></i> AI Keyword Extractor</h1>
-                        <p>Extract meaningful keywords from any text using advanced TF-IDF analysis</p>
-                    </div>
+        <!-- Results -->
+        <div id="results-content">
+          <div class="results-header">
+            <div>
+              <div class="results-count" id="resultsCount">0</div>
+              <div class="results-count-label">keywords found</div>
+            </div>
+            <button class="btn-copy" id="copyBtn">
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M10 1H3a2 2 0 0 0-2 2v9h1.5V3a.5.5 0 0 1 .5-.5h7V1zm4 3H6a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1zm-.5 9.5h-7v-8h7v8z"/>
+              </svg>
+              Copy all
+            </button>
+          </div>
 
-                    <div className="main-content">
-                        <div className="input-section">
-                            <h2 className="section-title">
-                                <i className="fas fa-edit"></i>
-                                Enter Your Text
-                            </h2>
+          <!-- Bar chart -->
+          <div class="keyword-bars" id="keywordBars"></div>
 
-                            <div className="sample-selector">
-                                <select onChange={handleSampleSelect} defaultValue="">
-                                    <option value="">Select a sample text...</option>
-                                    {Object.keys(sampleTexts).filter(key => key !== "").map(key => (
-                                        <option key={key} value={key}>{key}</option>
-                                    ))}
-                                </select>
-                            </div>
+          <!-- Chips -->
+          <div class="keyword-chips" id="keywordChips"></div>
 
-                            <textarea
-                                className="text-input"
-                                value={text}
-                                onChange={(e) => setText(e.target.value)}
-                                placeholder="Paste your article, research paper, or any text content here..."
-                            />
+          <!-- Stats -->
+          <div class="stats-bar">
+            <div class="stat">
+              <div class="stat-value" id="statMax">—</div>
+              <div class="stat-label">Max Score</div>
+            </div>
+            <div class="stat">
+              <div class="stat-value" id="statAvg">—</div>
+              <div class="stat-label">Avg Score</div>
+            </div>
+            <div class="stat">
+              <div class="stat-value" id="statWords">—</div>
+              <div class="stat-label">Words in</div>
+            </div>
+          </div>
+        </div>
 
-                            <div className="controls">
-                                <div className="keyword-count">
-                                    <label>Keywords:</label>
-                                    <input
-                                        type="number"
-                                        min="5"
-                                        max="20"
-                                        value={numKeywords}
-                                        onChange={(e) => setNumKeywords(parseInt(e.target.value))}
-                                    />
-                                </div>
+      </div>
+    </div><!-- /main-grid -->
 
-                                <button
-                                    className="extract-btn"
-                                    onClick={handleExtract}
-                                    disabled={loading}
-                                >
-                                    {loading ? (
-                                        <>
-                                            <div className="spinner"></div>
-                                            Analyzing...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <i className="fas fa-rocket"></i>
-                                            Extract Keywords
-                                        </>
-                                    )}
-                                </button>
-                            </div>
+    <footer>
+      KeyExtract — TF-IDF Keyword Intelligence ·
+      <a href="https://github.com" target="_blank">GitHub</a> ·
+      Built with Flask &amp; Scikit-learn
+    </footer>
 
-                            {error && (
-                                <div className="error">
-                                    <i className="fas fa-exclamation-triangle"></i>
-                                    {error}
-                                </div>
-                            )}
+  </div><!-- /wrapper -->
 
-                            {success && (
-                                <div className="success">
-                                    <i className="fas fa-check-circle"></i>
-                                    {success}
-                                </div>
-                            )}
-                        </div>
+  <!-- Toast notification -->
+  <div class="toast" id="toast"></div>
 
-                        <div className="results-section">
-                            <h2 className="section-title">
-                                <i className="fas fa-chart-bar"></i>
-                                Results
-                            </h2>
+  <script>
+    /* ── Config ───────────────────────────────────────────────── */
+    const DEFAULT_API = 'http://localhost:5000';
+    let API_BASE = localStorage.getItem('kx_api') || DEFAULT_API;
 
-                            {Object.keys(keywords).length > 0 ? (
-                                <>
-                                    <div className="tabs">
-                                        <button 
-                                            className={`tab ${activeTab === 'list' ? 'active' : ''}`}
-                                            onClick={() => setActiveTab('list')}
-                                        >
-                                            <i className="fas fa-list"></i> Keywords
-                                        </button>
-                                        <button 
-                                            className={`tab ${activeTab === 'chart' ? 'active' : ''}`}
-                                            onClick={() => setActiveTab('chart')}
-                                        >
-                                            <i className="fas fa-chart-bar"></i> Chart
-                                        </button>
-                                    </div>
+    /* ── DOM refs ─────────────────────────────────────────────── */
+    const textInput     = document.getElementById('textInput');
+    const numKeywords   = document.getElementById('numKeywords');
+    const sliderVal     = document.getElementById('sliderVal');
+    const extractBtn    = document.getElementById('extractBtn');
+    const clearBtn      = document.getElementById('clearBtn');
+    const errorBox      = document.getElementById('errorBox');
+    const wordCountEl   = document.getElementById('wordCount');
+    const charCountEl   = document.getElementById('charCount');
+    const statusDot     = document.getElementById('statusDot');
+    const statusText    = document.getElementById('statusText');
+    const statusPill    = document.getElementById('statusPill');
+    const apiUrlInput   = document.getElementById('apiUrlInput');
+    const configToggle  = document.getElementById('configToggle');
+    const configBody    = document.getElementById('configBody');
+    const btnSpinner    = document.getElementById('btnSpinner');
+    const btnText       = document.getElementById('btnText');
+    const copyBtn       = document.getElementById('copyBtn');
+    const toast         = document.getElementById('toast');
 
-                                    {activeTab === 'list' && (
-                                        <div className="keywords-grid">
-                                            {Object.entries(keywords).map(([keyword, score]) => (
-                                                <div key={keyword} className="keyword-card">
-                                                    <div className="keyword-text">{keyword}</div>
-                                                    <div className="keyword-score">Score: {score.toFixed(3)}</div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
+    apiUrlInput.value = API_BASE;
 
-                                    {activeTab === 'chart' && (
-                                        <div className="chart-container">
-                                            <BarChart keywords={keywords} />
-                                        </div>
-                                    )}
+    /* ── Slider ───────────────────────────────────────────────── */
+    function updateSlider() {
+      const val = numKeywords.value;
+      const min = numKeywords.min;
+      const max = numKeywords.max;
+      const pct = ((val - min) / (max - min)) * 100;
+      numKeywords.style.setProperty('--pct', pct + '%');
+      sliderVal.textContent = val;
+    }
+    numKeywords.addEventListener('input', updateSlider);
+    updateSlider();
 
-                                    <button className="download-btn" onClick={downloadCSV}>
-                                        <i className="fas fa-download"></i>
-                                        Download CSV
-                                    </button>
-                                </>
-                            ) : (
-                                <div className="empty-state">
-                                    <i className="fas fa-search"></i>
-                                    <h3>No Keywords Yet</h3>
-                                    <p>Enter some text and click "Extract Keywords" to see results here.</p>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            );
-        };
+    /* ── Word / char counter ──────────────────────────────────── */
+    textInput.addEventListener('input', () => {
+      const text = textInput.value;
+      charCountEl.textContent = text.length;
+      wordCountEl.textContent = text.trim() ? text.trim().split(/\s+/).length : 0;
+    });
 
-        ReactDOM.render(<KeywordExtractor />, document.getElementById('root'));
-    </script>
+    /* ── Clear button ─────────────────────────────────────────── */
+    clearBtn.addEventListener('click', () => {
+      textInput.value = '';
+      charCountEl.textContent = '0';
+      wordCountEl.textContent = '0';
+      hideError();
+      textInput.focus();
+    });
+
+    /* ── API config toggle ────────────────────────────────────── */
+    configToggle.addEventListener('click', () => {
+      configToggle.classList.toggle('open');
+      configBody.classList.toggle('open');
+    });
+
+    apiUrlInput.addEventListener('change', () => {
+      let url = apiUrlInput.value.trim().replace(/\/$/, '');
+      if (!url) url = DEFAULT_API;
+      API_BASE = url;
+      localStorage.setItem('kx_api', url);
+      checkHealth();
+    });
+
+    /* ── Health check ─────────────────────────────────────────── */
+    async function checkHealth() {
+      statusDot.className = 'status-dot checking';
+      statusText.textContent = 'checking...';
+      try {
+        const res = await fetch(`${API_BASE}/api/health`, { signal: AbortSignal.timeout(5000) });
+        if (res.ok) {
+          const data = await res.json();
+          statusDot.className = 'status-dot online';
+          statusText.textContent = data.models_loaded ? 'api online' : 'models error';
+          if (!data.models_loaded) statusDot.className = 'status-dot offline';
+        } else {
+          throw new Error('non-200');
+        }
+      } catch {
+        statusDot.className = 'status-dot offline';
+        statusText.textContent = 'api offline';
+      }
+    }
+
+    statusPill.addEventListener('click', checkHealth);
+    checkHealth();
+
+    /* ── Show / hide states ───────────────────────────────────── */
+    function showLoading() {
+      document.getElementById('resultsEmpty').style.display = 'none';
+      document.getElementById('results-content').style.display = 'none';
+      document.getElementById('loadingOverlay').classList.add('active');
+    }
+
+    function showResults() {
+      document.getElementById('resultsEmpty').style.display = 'none';
+      document.getElementById('loadingOverlay').classList.remove('active');
+      document.getElementById('results-content').style.display = 'block';
+    }
+
+    function showEmpty() {
+      document.getElementById('resultsEmpty').style.display = 'flex';
+      document.getElementById('loadingOverlay').classList.remove('active');
+      document.getElementById('results-content').style.display = 'none';
+    }
+
+    function showError(msg) {
+      errorBox.textContent = '⚠ ' + msg;
+      errorBox.style.display = 'block';
+    }
+
+    function hideError() {
+      errorBox.style.display = 'none';
+    }
+
+    /* ── Extract keywords ─────────────────────────────────────── */
+    extractBtn.addEventListener('click', extractKeywords);
+
+    textInput.addEventListener('keydown', e => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') extractKeywords();
+    });
+
+    async function extractKeywords() {
+      const text = textInput.value.trim();
+      if (!text) { showError('Please enter some text first.'); return; }
+      if (text.length < 10) { showError('Text is too short for meaningful extraction.'); return; }
+
+      hideError();
+      setLoading(true);
+      showLoading();
+
+      try {
+        const res = await fetch(`${API_BASE}/api/extract`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text, numKeywords: parseInt(numKeywords.value) }),
+          signal: AbortSignal.timeout(15000)
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(data.error || `Server error ${res.status}`);
+        }
+
+        renderResults(data, text);
+        showResults();
+
+      } catch (err) {
+        showEmpty();
+        if (err.name === 'TimeoutError') {
+          showError('Request timed out. Check if the backend is running.');
+        } else if (err.message.includes('fetch') || err.message.includes('network') || err.name === 'TypeError') {
+          showError(`Cannot reach API at ${API_BASE}. Is the backend running? Update the endpoint below.`);
+        } else {
+          showError(err.message);
+        }
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    /* ── Loading button state ─────────────────────────────────── */
+    function setLoading(on) {
+      extractBtn.disabled = on;
+      btnSpinner.style.display = on ? 'block' : 'none';
+      btnText.textContent = on ? 'Extracting...' : '⟶ Extract Keywords';
+    }
+
+    /* ── Render results ───────────────────────────────────────── */
+    function renderResults(keywords, originalText) {
+      const entries = Object.entries(keywords).sort((a, b) => b[1] - a[1]);
+      const maxScore = entries[0]?.[1] || 1;
+      const avgScore = entries.reduce((s, [,v]) => s + v, 0) / entries.length;
+      const wordCount = originalText.trim().split(/\s+/).length;
+
+      document.getElementById('resultsCount').textContent = entries.length;
+      document.getElementById('statMax').textContent = maxScore.toFixed(4);
+      document.getElementById('statAvg').textContent = avgScore.toFixed(4);
+      document.getElementById('statWords').textContent = wordCount;
+
+      // Bars
+      const barsEl = document.getElementById('keywordBars');
+      barsEl.innerHTML = '';
+      entries.forEach(([kw, score], i) => {
+        const pct = (score / maxScore) * 100;
+        const row = document.createElement('div');
+        row.className = 'keyword-row';
+        row.style.animationDelay = `${i * 0.04}s`;
+        row.innerHTML = `
+          <span class="kw-name" title="${kw}">${kw}</span>
+          <div class="kw-track">
+            <div class="kw-fill" data-pct="${pct}"></div>
+          </div>
+          <span class="kw-score">${score.toFixed(4)}</span>
+        `;
+        barsEl.appendChild(row);
+      });
+
+      // Animate bar fills after paint
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          document.querySelectorAll('.kw-fill').forEach(el => {
+            el.style.transform = `scaleX(${el.dataset.pct / 100})`;
+          });
+        });
+      });
+
+      // Chips
+      const chipsEl = document.getElementById('keywordChips');
+      chipsEl.innerHTML = '';
+      entries.forEach(([kw, score], i) => {
+        const chip = document.createElement('div');
+        chip.className = 'chip' + (i < 3 ? ' top3' : '');
+        chip.style.animationDelay = `${0.2 + i * 0.04}s`;
+        chip.title = `Score: ${score.toFixed(4)} — click to copy`;
+        chip.innerHTML = `${i < 3 ? '★ ' : ''}${kw}`;
+        chip.addEventListener('click', () => {
+          navigator.clipboard.writeText(kw).then(() => showToast(`"${kw}" copied`));
+        });
+        chipsEl.appendChild(chip);
+      });
+    }
+
+    /* ── Copy all ─────────────────────────────────────────────── */
+    copyBtn.addEventListener('click', () => {
+      const chips = [...document.querySelectorAll('.chip')].map(c => c.textContent.replace('★ ', '').trim());
+      const text = chips.join(', ');
+      navigator.clipboard.writeText(text).then(() => {
+        copyBtn.classList.add('copied');
+        copyBtn.querySelector('svg + span, span')?.remove();
+        showToast('All keywords copied to clipboard');
+        setTimeout(() => copyBtn.classList.remove('copied'), 2000);
+      });
+    });
+
+    /* ── Toast ────────────────────────────────────────────────── */
+    let toastTimer;
+    function showToast(msg) {
+      clearTimeout(toastTimer);
+      toast.textContent = msg;
+      toast.classList.add('show');
+      toastTimer = setTimeout(() => toast.classList.remove('show'), 2500);
+    }
+
+    /* ── Stagger entry animations ─────────────────────────────── */
+    document.querySelectorAll('.fade-up').forEach((el, i) => {
+      el.style.animationDelay = `${i * 0.08}s`;
+    });
+  </script>
+
 </body>
 </html>
