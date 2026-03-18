@@ -42,19 +42,19 @@ Key features:
 ## Architecture
 
 ```
-┌─────────────────────────────────┐       ┌──────────────────────────────┐
-│   Frontend  (Vercel)            │       │   Backend  (Render)          │
+┌─────────────────────────────────┐        ┌──────────────────────────────┐
+│   Frontend  (Vercel)            │        │   Backend  (Render)          │
 │   index.html                    │──────▶│   Flask API  /api/extract    │
-│   Pure HTML / CSS / JS          │  POST │   Gunicorn  (1 worker)       │
+│   Pure HTML / CSS / JS          │  POST  │   Gunicorn  (1 worker)       │
 │   No framework, no bundler      │◀──────│   Scikit-learn + NLTK        │
-└─────────────────────────────────┘  JSON └──────────────┬───────────────┘
-                                                          │
-                                              ┌───────────▼──────────────┐
-                                              │  MLflow  (DagsHub)        │
-                                              │  Model registry           │
-                                              │  Experiment tracking      │
-                                              │  Artefact storage (.pkl)  │
-                                              └──────────────────────────┘
+└─────────────────────────────────┘  JSON  └──────────────┬───────────────┘
+                                                         │
+                                             ┌───────────▼──────────────┐
+                                             │  MLflow  (DagsHub)       │
+                                             │  Model registry          │
+                                             │  Experiment tracking     │
+                                             │  Artefact storage (.pkl) │
+                                             └──────────────────────────┘
 ```
 
 **Model loading flow on Render startup:**
