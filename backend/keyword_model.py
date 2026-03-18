@@ -9,11 +9,14 @@ import mlflow.pyfunc
 class KeywordExtractorModel(mlflow.pyfunc.PythonModel):
 
     def load_context(self, context):
-        with open(context.artifacts["count_vector"], "rb") as f:
+        def fix_path(p):
+            return p.replace("\\", "/")
+
+        with open(fix_path(context.artifacts["count_vector"]), "rb") as f:
             self.cv = pickle.load(f)
-        with open(context.artifacts["tfidf_transformer"], "rb") as f:
+        with open(fix_path(context.artifacts["tfidf_transformer"]), "rb") as f:
             self.tfidf_trans = pickle.load(f)
-        with open(context.artifacts["feature_names"], "rb") as f:
+        with open(fix_path(context.artifacts["feature_names"]), "rb") as f:
             self.feature_names = pickle.load(f)
 
         nltk.download("stopwords", quiet=True)
@@ -57,3 +60,6 @@ class KeywordExtractorModel(mlflow.pyfunc.PythonModel):
                      for i, s in items if i < len(self.feature_names)}
             results.append(kw)
         return results
+    
+import mlflow.models
+mlflow.models.set_model(KeywordExtractorModel())

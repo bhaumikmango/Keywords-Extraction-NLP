@@ -1,110 +1,78 @@
 """
-mlflow_log.py
-─────────────────────────────────────────────────────────────────────────────
-One-time script to register your pre-trained TF-IDF pipeline into MLflow.
-
-Run once locally (or in CI) to log the models, then point your server
-at DagsHub or any MLflow tracking URI to pull them down for inference.
-
-Usage:
+mlflow_log.py  —  registers the TF-IDF pipeline in MLflow / DagsHub
+Run once from the backend/ directory:
     python mlflow_log.py
-
-Environment variables (set in .env or shell):
-    MLFLOW_TRACKING_URI   — e.g. https://dagshub.com/<user>/<repo>.mlflow
-    MLFLOW_TRACKING_USERNAME  (DagsHub username)
-    MLFLOW_TRACKING_PASSWORD  (DagsHub token)
 """
 
 import os
-import pickle
+import pathlib
 import mlflow
 import mlflow.pyfunc
-import mlflow.sklearn
 import logging
-import re
-import nltk
-from nltk.corpus import stopwords
-from nltk.stem.porter import PorterStemmer
-from nltk.stem.wordnet import WordNetLemmatizer
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, format="%(levelname)s | %(message)s")
 logger = logging.getLogger(__name__)
 
-# ── MLflow tracking URI ────────────────────────────────────────────────────
-TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "mlruns")   # default: local ./mlruns
-EXPERIMENT   = os.getenv("MLFLOW_EXPERIMENT_NAME", "keyword-extractor")
-MODEL_NAME   = os.getenv("MLFLOW_MODEL_NAME", "keyword-extractor-tfidf")
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
 
-# ── Credentials (needed for DagsHub / remote URIs) ────────────────────────
-username = os.getenv("MLFLOW_TRACKING_USERNAME")
-password = os.getenv("MLFLOW_TRACKING_PASSWORD")
+TRACKING_URI = os.environ["MLFLOW_TRACKING_URI"]
+USERNAME     = os.environ.get("MLFLOW_TRACKING_USERNAME", "")
+PASSWORD     = os.environ.get("MLFLOW_TRACKING_PASSWORD", "")
+EXPERIMENT   = os.environ.get("MLFLOW_EXPERIMENT_NAME", "keyword-extractor")
+MODEL_NAME   = os.environ.get("MLFLOW_MODEL_NAME",      "keyword-extractor-tfidf")
 
-if username and password:
-    os.environ["MLFLOW_TRACKING_USERNAME"] = username
-    os.environ["MLFLOW_TRACKING_PASSWORD"] = password
+if USERNAME:
+    os.environ["MLFLOW_TRACKING_USERNAME"] = USERNAME
+if PASSWORD:
+    os.environ["MLFLOW_TRACKING_PASSWORD"] = PASSWORD
 
 mlflow.set_tracking_uri(TRACKING_URI)
 mlflow.set_experiment(EXPERIMENT)
 
-# ── Custom MLflow PythonModel wrapper ─────────────────────────────────────
-from keyword_model import KeywordExtractorModel
+# Always forward slashes
+BASE      = pathlib.Path(__file__).parent.resolve()
+PKL_CV    = BASE / "Count_Vector.pkl"
+PKL_TFIDF = BASE / "TFIDF_Transformer.pkl"
+PKL_FEAT  = BASE / "Feature_Names.pkl"
 
-# ── Log run ───────────────────────────────────────────────────────────────
-def main():
-    logger.info(f"Logging to MLflow at: {TRACKING_URI}")
+for p in [PKL_CV, PKL_TFIDF, PKL_FEAT]:
+    if not p.exists():
+        raise FileNotFoundError(f"Missing: {p}")
 
-    with mlflow.start_run(run_name="initial-registration") as run:
+artifacts = {
+    "count_vector":      PKL_CV.as_posix(),
+    "tfidf_transformer": PKL_TFIDF.as_posix(),
+    "feature_names":     PKL_FEAT.as_posix(),
+}
 
-        # Tag the run with metadata
-        mlflow.set_tags({
-            "model_type":   "tfidf-keyword-extractor",
-            "framework":    "scikit-learn",
-            "author":       os.getenv("USER", "unknown"),
-        })
+logger.info("Artifact paths:")
+for k, v in artifacts.items():
+    logger.info(f"  {k}: {v}")
 
-        # Log hyperparams / config
-        mlflow.log_params({
-            "vectorizer":    "CountVectorizer",
-            "transformer":   "TfidfTransformer",
-            "stopwords_ext": "fig,figure,image,sample,using,show,result,large,also,one-nine",
-            "stemmer":       "PorterStemmer",
-            "lemmatizer":    "WordNetLemmatizer",
-        })
+with mlflow.start_run(run_name="registration") as run:
 
-        # ── Log raw artefacts (pkl files) ──────────────────────────
-        mlflow.log_artifact("Count_Vector.pkl",      artifact_path="model_artifacts")
-        mlflow.log_artifact("TFIDF_Transformer.pkl", artifact_path="model_artifacts")
-        mlflow.log_artifact("Feature_Names.pkl",     artifact_path="model_artifacts")
-        logger.info("Raw .pkl artefacts logged")
+    mlflow.set_tags({"model_type": "tfidf-keyword-extractor", "framework": "scikit-learn"})
+    mlflow.log_params({"vectorizer": "CountVectorizer", "transformer": "TfidfTransformer",
+                       "stemmer": "PorterStemmer", "lemmatizer": "WordNetLemmatizer"})
 
-        # ── Log as PythonModel ─────────────────────────────────────
-        artifacts = {
-            "count_vector":      "Count_Vector.pkl",
-            "tfidf_transformer": "TFIDF_Transformer.pkl",
-            "feature_names":     "Feature_Names.pkl",
-        }
+    mlflow.log_artifact(PKL_CV.as_posix(),    artifact_path="model_artifacts")
+    mlflow.log_artifact(PKL_TFIDF.as_posix(), artifact_path="model_artifacts")
+    mlflow.log_artifact(PKL_FEAT.as_posix(),  artifact_path="model_artifacts")
+    logger.info("Raw .pkl artefacts logged")
 
-        mlflow.pyfunc.log_model(
-            artifact_path  = "keyword_extractor",
-            python_model   = KeywordExtractorModel(),
-            artifacts      = artifacts,
-            registered_model_name = MODEL_NAME,
-            pip_requirements = [
-                "scikit-learn==1.6.1",
-                "nltk==3.9.1",
-            ],
-        )
-        logger.info(f"Model registered as '{MODEL_NAME}'")
+    mlflow.pyfunc.log_model(
+        artifact_path         = "keyword_extractor",
+        python_model          = "keyword_model.py",
+        artifacts             = artifacts,
+        registered_model_name = MODEL_NAME,
+        pip_requirements      = ["scikit-learn==1.6.1", "nltk==3.9.1"],
+        code_paths            = ["keyword_model.py"],
+    )
 
-        run_id = run.info.run_id
-        logger.info(f"Run ID: {run_id}")
-        logger.info(f"View at: {TRACKING_URI}/#/experiments/{mlflow.get_experiment_by_name(EXPERIMENT).experiment_id}/runs/{run_id}")
+    logger.info(f"Model registered as '{MODEL_NAME}'")
 
-    print("\n✅  Model logged and registered successfully.")
-    print(f"   Tracking URI : {TRACKING_URI}")
-    print(f"   Experiment   : {EXPERIMENT}")
-    print(f"   Model name   : {MODEL_NAME}")
-
-
-if __name__ == "__main__":
-    main()
+print(f"\n✅  Done — model: {MODEL_NAME}")
