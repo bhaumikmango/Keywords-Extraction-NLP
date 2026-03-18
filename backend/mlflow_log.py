@@ -9,6 +9,7 @@ import pathlib
 import mlflow
 import mlflow.pyfunc
 import logging
+from keyword_model import KeywordExtractorModel
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s | %(message)s")
 logger = logging.getLogger(__name__)
@@ -64,13 +65,14 @@ with mlflow.start_run(run_name="registration") as run:
     mlflow.log_artifact(PKL_FEAT.as_posix(),  artifact_path="model_artifacts")
     logger.info("Raw .pkl artefacts logged")
 
+    os.chdir(BASE)
+
     mlflow.pyfunc.log_model(
         artifact_path         = "keyword_extractor",
-        python_model          = "keyword_model.py",
+        python_model          = KeywordExtractorModel(),
         artifacts             = artifacts,
         registered_model_name = MODEL_NAME,
         pip_requirements      = ["scikit-learn==1.6.1", "nltk==3.9.1"],
-        code_paths            = ["keyword_model.py"],
     )
 
     logger.info(f"Model registered as '{MODEL_NAME}'")

@@ -9,15 +9,22 @@ import mlflow.pyfunc
 class KeywordExtractorModel(mlflow.pyfunc.PythonModel):
 
     def load_context(self, context):
-        def fix_path(p):
-            return p.replace("\\", "/")
+        import pickle, pathlib
 
-        with open(fix_path(context.artifacts["count_vector"]), "rb") as f:
-            self.cv = pickle.load(f)
-        with open(fix_path(context.artifacts["tfidf_transformer"]), "rb") as f:
-            self.tfidf_trans = pickle.load(f)
-        with open(fix_path(context.artifacts["feature_names"]), "rb") as f:
-            self.feature_names = pickle.load(f)
+        def load_pkl(path_str):
+            # Normalize any backslashes and reconstruct just the filename
+            filename = pathlib.PurePosixPath(path_str.replace("\\", "/")).name
+            # Try the exact path first, fall back to just the filename
+            try:
+                with open(path_str, "rb") as f:
+                    return pickle.load(f)
+            except FileNotFoundError:
+                with open(filename, "rb") as f:
+                    return pickle.load(f)
+
+        self.cv            = load_pkl(context.artifacts["count_vector"])
+        self.tfidf_trans   = load_pkl(context.artifacts["tfidf_transformer"])
+        self.feature_names = load_pkl(context.artifacts["feature_names"])
 
         nltk.download("stopwords", quiet=True)
         nltk.download("punkt",     quiet=True)
@@ -60,6 +67,6 @@ class KeywordExtractorModel(mlflow.pyfunc.PythonModel):
                      for i, s in items if i < len(self.feature_names)}
             results.append(kw)
         return results
-    
+
 import mlflow.models
 mlflow.models.set_model(KeywordExtractorModel())

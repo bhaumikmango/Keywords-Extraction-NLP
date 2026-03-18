@@ -105,7 +105,7 @@ def load_mlflow():
     try:
         import mlflow
         import mlflow.pyfunc
-        
+
         logger.info(f"mlflow version: {mlflow.__version__}")
 
         username = os.getenv("MLFLOW_TRACKING_USERNAME")
@@ -140,11 +140,17 @@ def load_mlflow():
 
 
 # ── Choose loading strategy ────────────────────────────────────────────────
-if MODEL_SOURCE == "mlflow":
-    models_loaded = load_mlflow()
-else:
-    models_loaded = load_local()
+import threading
 
+def _load_in_background():
+    global models_loaded
+    if MODEL_SOURCE == "mlflow":
+        models_loaded = load_mlflow()
+    else:
+        models_loaded = load_local()
+
+# Start loading in background so the port binds immediately
+threading.Thread(target=_load_in_background, daemon=True).start()
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  Inference helpers
