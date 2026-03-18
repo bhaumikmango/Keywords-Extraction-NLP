@@ -48,13 +48,13 @@ Key features:
 │   Pure HTML / CSS / JS          │  POST  │   Gunicorn  (1 worker)       │
 │   No framework, no bundler      │◀──────│   Scikit-learn + NLTK        │
 └─────────────────────────────────┘  JSON  └──────────────┬───────────────┘
-                                                         │
-                                             ┌───────────▼──────────────┐
-                                             │  MLflow  (DagsHub)       │
-                                             │  Model registry          │
-                                             │  Experiment tracking     │
-                                             │  Artefact storage (.pkl) │
-                                             └──────────────────────────┘
+                                                          │
+                                              ┌───────────▼──────────────┐
+                                              │  MLflow  (DagsHub)       │
+                                              │  Model registry          │
+                                              │  Experiment tracking     │
+                                              │  Artefact storage (.pkl) │
+                                              └──────────────────────────┘
 ```
 
 **Model loading flow on Render startup:**
