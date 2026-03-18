@@ -134,7 +134,7 @@ def load_mlflow():
         logger.error(f"mlflow import error: {e} — falling back to local loading")
         return load_local()
     except Exception as e:
-        logger.error(f"Error loading MLflow model: {e}")
+        logger.error(f"Error loading MLflow model: {e}", exc_info=True)
         logger.warning("Falling back to local model loading…")
         return load_local()
 
