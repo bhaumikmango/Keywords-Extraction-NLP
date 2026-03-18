@@ -140,20 +140,11 @@ def load_mlflow():
 
 
 # ── Choose loading strategy ────────────────────────────────────────────────
-import threading
 
-def _load_in_background():
-    global models_loaded
-    try:
-        if MODEL_SOURCE == "mlflow":
-            models_loaded = load_mlflow()
-        else:
-            models_loaded = load_local()
-    except Exception as e:
-        logger.error(f"Background model loading failed: {e}", exc_info=True)
-
-# Start loading in background so the port binds immediately
-threading.Thread(target=_load_in_background, daemon=True).start()
+if MODEL_SOURCE == "mlflow":
+    models_loaded = load_mlflow()
+else:
+    models_loaded = load_local()
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  Inference helpers
