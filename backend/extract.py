@@ -144,10 +144,13 @@ import threading
 
 def _load_in_background():
     global models_loaded
-    if MODEL_SOURCE == "mlflow":
-        models_loaded = load_mlflow()
-    else:
-        models_loaded = load_local()
+    try:
+        if MODEL_SOURCE == "mlflow":
+            models_loaded = load_mlflow()
+        else:
+            models_loaded = load_local()
+    except Exception as e:
+        logger.error(f"Background model loading failed: {e}", exc_info=True)
 
 # Start loading in background so the port binds immediately
 threading.Thread(target=_load_in_background, daemon=True).start()
@@ -215,6 +218,17 @@ def health_check():
         "model_name":    MLFLOW_MODEL if MODEL_SOURCE == "mlflow" else "local",
     })
 
+@app.route("/api/debug", methods=["GET"])
+def debug():
+    import traceback, sys
+    return jsonify({
+        "models_loaded": models_loaded,
+        "model_source":  MODEL_SOURCE,
+        "mlflow_uri":    MLFLOW_URI,
+        "mlflow_model":  MLFLOW_MODEL,
+        "mlflow_stage":  MLFLOW_STAGE,
+        "python":        sys.version,
+    })
 
 @app.route("/api/extract", methods=["POST"])
 def extract_endpoint():
